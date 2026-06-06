@@ -9,15 +9,21 @@ from typing import Any, Dict
 from flask import Flask, jsonify, request, send_from_directory
 
 from src.drawing_rng.stroke_token_encoder import encode_json_payload
+import os
+from supabase import create_client, Client
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
-import os
-
 DATA_DIR = Path(os.environ.get("DATA_DIR", ROOT / "datasets"))
 SAMPLES = DATA_DIR / "stroke_samples"
 SAMPLES.mkdir(parents=True, exist_ok=True)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
+supabase: Client | None = None
+
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 app = Flask(__name__, static_folder=str(STATIC), static_url_path="")
 
 
@@ -55,39 +61,48 @@ def save_sample():
     if not isinstance(payload, dict):
         return jsonify({"error": "JSON body must be an object"}), 400
 
-    if not payload.get("consent_to_research"):
-        return jsonify({"error": "consent_to_research must be true before saving"}), 400
+    if supabase is None:
+        return jsonify({
+            "error": "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+        }), 500
 
-    name = safe_slug(payload.get("name"), "sample")
-    if not name.endswith(".json"):
-        name += ".json"
+    strokes = payload.get("strokes", [])
+    if not isinstance(strokes, list) or len(strokes) == 0:
+        return jsonify({"error": "No strokes submitted"}), 400
 
-    concept = safe_slug(payload.get("concept"), "unknown")
-    participant_id = safe_slug(payload.get("participant_id"), "anon")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    filename = f"{stamp}_{participant_id}_{concept}_{name}"
-    path = SAMPLES / filename
-
-    data: Dict[str, Any] = {
-        "schema_version": "drng-stroke-sample-v1",
-        "name": name,
-        "saved_at_utc": stamp,
-        "participant_id": participant_id,
-        "concept": concept,
-        "concept_label": str(payload.get("concept_label") or concept),
+    row = {
+        "participant_id": payload.get("participant_id"),
+        "concept": payload.get("concept"),
         "redraw_id": payload.get("redraw_id"),
-        "ui_version": payload.get("ui_version", "unknown"),
-        "consent_to_research": True,
-        "data_notice": "Anonymous stroke sample. Do not collect names, signatures, initials, passwords, or identifying drawings.",
-        "canvas_size": payload.get("canvas_size"),
-        "strokes": payload.get("strokes", []),
-        "params": payload.get("params", {}),
-        "serialized": payload.get("serialized"),
+        "sample_name": payload.get("name") or payload.get("sample_name") or "sample",
         "notes": payload.get("notes", ""),
-    }
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return jsonify({"ok": True, "filename": filename, "path": str(path.relative_to(ROOT))})
 
+        "strokes": strokes,
+        "params": payload.get("params", {}),
+        "canvas_size": payload.get("canvas_size"),
+        "serialized": payload.get("serialized"),
+
+        "ui_version": payload.get("ui_version", "unknown"),
+        "user_agent": request.headers.get("User-Agent", ""),
+    }
+
+    try:
+        result = (
+            supabase
+            .table("stroke_samples")
+            .insert(row)
+            .execute()
+        )
+
+        inserted = result.data[0] if result.data else {}
+        return jsonify({
+            "ok": True,
+            "id": inserted.get("id"),
+            "message": "Saved to Supabase"
+        })
+
+    except Exception as exc:
+        return jsonify({"error": f"Supabase insert failed: {exc}"}), 500
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)

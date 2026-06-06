@@ -273,19 +273,17 @@ async function saveSample() {
     const res = await fetch('/api/save_sample', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        strokes,
-        params: getParams(),
-        name: sampleName,
-        notes: notesEl.value || '',
-        canvas_size: [canvas.width, canvas.height],
-        serialized: latestSerialized || null,
-        participant_id: participantId,
-        concept: promptSelectEl.value,
-        concept_label: selectedPromptLabel(),
-        redraw_id: parseInt(redrawIndexEl.value || '1', 10),
-        consent_to_research: true,
-        ui_version: 'v0.4-clean',
-      }),
+  strokes,
+  params: getParams(),
+  participant_id: participantId,
+  concept: conceptEl.value,
+  redraw_id: parseInt(redrawEl.value, 10),
+  name: sampleNameEl.value || 'sample',
+  notes: notesEl.value || '',
+  canvas_size: [canvas.width, canvas.height],
+  serialized: latestSerialized || null,
+  ui_version: 'clean-ui-v1'
+}),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Save failed');
