@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Drawing-RNG · Stroke Collection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">✏️</div>
+      <div>
+        <div class="brand-title">Drawing-RNG</div>
+        <div class="brand-sub">Stroke-token collection UI · v0.4-clean</div>
+      </div>
+    </div>
+    <div class="safety-badge">Research prototype · not for real secrets</div>
+  </header>
+
+  <section class="notice">
+    <strong>Data notice:</strong> please do not draw real signatures, names, initials, passwords, private symbols, or anything personally identifying. This page saves anonymous stroke coordinates for redraw-stability research.
+  </section>
+
+  <main class="workspace">
+    <section class="panel canvas-panel">
+      <div class="panel-header">
+        <div>
+          <div class="kicker">Step 1</div>
+          <h1>Draw the prompt naturally</h1>
+        </div>
+        <span class="stroke-pill" id="strokeCount">0 strokes</span>
+      </div>
+
+      <div class="prompt-card">
+        <span class="prompt-label">Current prompt</span>
+        <span class="prompt-text" id="activePromptText">House + lake</span>
+      </div>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="drawCanvas" width="1200" height="900" aria-label="drawing canvas"></canvas>
+        <span class="canvas-corner">draw here</span>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" id="undoBtn">↩ Undo</button>
+        <button class="btn btn-danger" id="clearBtn">✕ Clear</button>
+        <button class="btn btn-primary" id="tokenizeBtn">Generate tokens</button>
+        <button class="btn btn-save" id="downloadBtn">Save drawing</button>
+      </div>
+
+      <p class="hint">Tip: draw the same prompt 5 times without trying to perfectly trace the previous version. Natural variation is useful for the experiment.</p>
+    </section>
+
+    <aside class="side-stack">
+      <section class="panel">
+        <div class="kicker">Step 2</div>
+        <h2>Label this sample</h2>
+
+        <div class="field compact-id">
+          <span class="field-label">Anonymous participant ID</span>
+          <code id="participantIdView">loading…</code>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="promptSelect">Prompt / concept</label>
+          <select id="promptSelect">
+            <option value="house_lake" selected>House + lake</option>
+            <option value="star">Star</option>
+            <option value="heart">Heart</option>
+            <option value="spiral">Spiral</option>
+            <option value="flower">Flower</option>
+            <option value="stickman">Stickman</option>
+            <option value="triangle">Triangle</option>
+            <option value="custom_symbol">Custom symbol</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="field two-col">
+          <div>
+            <label class="field-label" for="redrawIndex">Redraw #</label>
+            <input id="redrawIndex" type="number" min="1" max="20" value="1" />
+          </div>
+          <div>
+            <label class="field-label" for="sampleName">Filename label</label>
+            <input id="sampleName" type="text" placeholder="auto" />
+          </div>
+        </div>
+
+        <div class="auto-name" id="autoNamePreview">house_lake_redraw_01</div>
+
+        <div class="field">
+          <label class="field-label" for="notes">Notes, optional</label>
+          <textarea id="notes" placeholder="Device, mouse/touch, or anything unusual. Do not include personal info."></textarea>
+        </div>
+
+        <label class="consent-row">
+          <input id="consentCheckbox" type="checkbox" checked />
+          <span>I understand this saves anonymous drawing strokes for research/demo analysis.</span>
+        </label>
+
+        <p id="saveStatus" class="status-line"></p>
+      </section>
+
+      <section class="panel">
+        <div class="kicker">Step 3</div>
+        <h2>Encoder mode</h2>
+        <div class="field">
+          <label class="field-label" for="profileSelect">Profile</label>
+          <select id="profileSelect">
+            <option value="tolerant">Tolerant · redraw-friendly</option>
+            <option value="balanced" selected>Balanced · research default</option>
+            <option value="strict">Strict · detail-heavy</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="orderMode">Order mode</label>
+          <select id="orderMode">
+            <option value="spatial" selected>Spatial · final picture matters</option>
+            <option value="drawn">Drawn · gesture order matters</option>
+          </select>
+        </div>
+        <p class="hint">For dataset collection, use <strong>Balanced + Spatial</strong> unless you are intentionally testing another mode.</p>
+
+        <details class="advanced-box">
+          <summary>Advanced encoder settings</summary>
+          <div class="advanced-grid">
+            <div class="field">
+              <label class="field-label">Resample spacing <span id="spacingLabel" class="range-val">0.05</span></label>
+              <input id="spacing" type="range" min="0.02" max="0.15" step="0.01" value="0.05" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="directionBuckets">Direction buckets</label>
+              <select id="directionBuckets">
+                <option value="4">4 directions</option>
+                <option value="8" selected>8 directions</option>
+                <option value="16">16 directions</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Short max <span id="lenShortMaxLabel" class="range-val">0.18</span></label>
+              <input id="lenShortMax" type="range" min="0.05" max="0.30" step="0.01" value="0.18" />
+            </div>
+            <div class="field">
+              <label class="field-label">Medium max <span id="lenMedMaxLabel" class="range-val">0.40</span></label>
+              <input id="lenMedMax" type="range" min="0.20" max="0.80" step="0.01" value="0.40" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="zoneGrid">Start zone grid</label>
+              <select id="zoneGrid">
+                <option value="2">2×2</option>
+                <option value="3" selected>3×3</option>
+                <option value="4">4×4</option>
+                <option value="5">5×5</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Min stroke length <span id="minStrokeLengthLabel" class="range-val">0.035</span></label>
+              <input id="minStrokeLength" type="range" min="0.00" max="0.12" step="0.005" value="0.035" />
+            </div>
+            <div class="field">
+              <label class="field-label">RDP ε <span id="simplifyEpsilonLabel" class="range-val">0.015</span></label>
+              <input id="simplifyEpsilon" type="range" min="0.000" max="0.050" step="0.005" value="0.015" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="jitterRunMax">Jitter cleanup</label>
+              <select id="jitterRunMax">
+                <option value="0">Off</option>
+                <option value="1" selected>1-step</option>
+                <option value="2">2-step</option>
+              </select>
+            </div>
+          </div>
+          <div class="checks-grid">
+            <label><input id="includeTurnTokens" type="checkbox" checked /> Turn tokens</label>
+            <label><input id="includeTurnMagnitude" type="checkbox" /> Turn magnitude</label>
+            <label><input id="includeStartZone" type="checkbox" checked /> Start zone</label>
+            <label><input id="includePenupMoves" type="checkbox" checked /> Pen-up moves</label>
+            <label><input id="includeClosedTokens" type="checkbox" checked /> Closed shapes</label>
+            <label><input id="includeRelationTokens" type="checkbox" checked /> Stroke relations</label>
+          </div>
+        </details>
+      </section>
+    </aside>
+
+    <section class="panel results-panel">
+      <div class="panel-header">
+        <div>
+          <div class="kicker">Output</div>
+          <h2>Encoding result</h2>
+        </div>
+        <button class="btn btn-ghost" id="copySerialBtn">Copy serialized tokens</button>
+      </div>
+      <div id="errorBar" class="error-bar"></div>
+
+      <div class="summary-grid">
+        <div class="metric-card">
+          <span class="metric-label">Similarity vs previous drawing</span>
+          <pre id="similarityOutput" class="metric-value">Generate twice to compare.</pre>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Flags</span>
+          <pre id="statsOutput" class="metric-value muted-metric">No result yet.</pre>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Demo seed, 32 bytes</span>
+          <pre id="streamOutput" class="metric-value muted-metric">Not generated yet.</pre>
+        </div>
+      </div>
+
+      <details class="raw-details">
+        <summary>Show raw token data</summary>
+        <div class="output-grid">
+          <div class="output-cell">
+            <div class="output-cell-title">Serialized seed material</div>
+            <pre class="output-pre" id="serializedOutput">Draw something, then click Generate tokens.</pre>
+          </div>
+          <div class="output-cell">
+            <div class="output-cell-title">Token list</div>
+            <pre class="output-pre" id="tokensOutput">[]</pre>
+          </div>
+        </div>
+      </details>
+    </section>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
