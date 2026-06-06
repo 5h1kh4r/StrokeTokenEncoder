@@ -31,6 +31,8 @@ const closedTokensEl   = $('includeClosedTokens');
 const relationTokensEl = $('includeRelationTokens');
 
 const promptSelectEl   = $('promptSelect');
+// Backwards-compatible alias: some older save code used conceptEl.
+const conceptEl        = promptSelectEl;
 const activePromptEl   = $('activePromptText');
 const redrawIndexEl    = $('redrawIndex');
 const sampleNameEl     = $('sampleName');
@@ -273,22 +275,24 @@ async function saveSample() {
     const res = await fetch('/api/save_sample', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-  strokes,
-  params: getParams(),
-  participant_id: participantId,
-  concept: conceptEl.value,
-  redraw_id: parseInt(redrawEl.value, 10),
-  name: sampleNameEl.value || 'sample',
-  notes: notesEl.value || '',
-  canvas_size: [canvas.width, canvas.height],
-  serialized: latestSerialized || null,
-  ui_version: 'clean-ui-v1'
-}),
+        strokes,
+        params: getParams(),
+        name: sampleName,
+        notes: notesEl.value || '',
+        canvas_size: [canvas.width, canvas.height],
+        serialized: latestSerialized || null,
+        participant_id: participantId,
+        concept: promptSelectEl.value,
+        concept_label: selectedPromptLabel(),
+        redraw_id: parseInt(redrawIndexEl.value || '1', 10),
+        consent_to_research: true,
+        ui_version: 'v0.4-clean',
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Save failed');
     saveStatusEl.className = 'status-line ok';
-    saveStatusEl.textContent = `✓ Saved: ${data.filename}`;
+    saveStatusEl.textContent = `✓ Saved: ${data.filename || data.id || data.message || 'sample'}`;
   } catch (err) {
     saveStatusEl.className = 'status-line bad';
     saveStatusEl.textContent = `✗ ${err.message}`;
